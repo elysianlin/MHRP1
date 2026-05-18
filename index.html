@@ -1,1 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工業馬達管理平台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+TC:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff;  
+    --bg2: #ffffff;
+    --bg3: #e6f4fab9;
+    --bg4: #b3b8c2;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #0b0e17;
+    --text2: #111621;
+    --text3: #181d2b;
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.12);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --gray-dim: rgba(139,146,168,0.1);
+    --font: 'IBM Plex Sans TC', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --nav-w: 200px;
+    --header-h: 52px;
+  }
+   /* ===== 1. 一頁式核心：html/body/main 全部用 100vh，禁止 overflow ===== */
+  html, body { height: 100vh; overflow: hidden; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; display: flex; flex-direction: column; }
+ 
+  /* Header */
+  .header { height: var(--header-h); flex-shrink: 0; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 0; z-index: 100; }
+  .logo { display: flex; align-items: center; gap: 10px; margin-right: 40px; }
+  .logo-icon { width: 32px; height: 32px; background: var(--blue); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .logo-icon i { font-size: 18px; color: white; }
+  .logo-name { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+  .nav-tabs { display: flex; gap: 2px; }
+  .nav-tab { padding: 6px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 400; color: var(--text2); cursor: pointer; border: none; background: none; transition: all 0.15s; white-space: nowrap; }
+  .nav-tab:hover { color: var(--text); background: var(--bg3); }
+  .nav-tab.active { color: var(--blue); background: var(--blue-dim); font-weight: 500; }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 5px; }
+  .status-label { font-size: 12px; color: var(--green); font-weight: 500; }
+  .header-icon { width: 32px; height: 32px; border-radius: var(--radius); background: var(--bg3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text2); }
+  .header-icon i { font-size: 16px; }
+  .user-badge { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: var(--radius); background: var(--bg3); border: 1px solid var(--border); cursor: pointer; }
+  .user-avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: white; }
+  .user-name { font-size: 12px; color: var(--text2); }
+  #clock { font-family: var(--mono); font-size: 12px; color: var(--text3); }
+ 
+  /* Main：佔剩餘高度，禁止自身 overflow */
+  .main { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+ 
+  /* Page */
+  .page { display: none; flex: 1; min-height: 0; flex-direction: column; overflow: hidden; }
+  .page.active { display: flex; }
+ 
+  /* ===== Overview ===== */
+  .overview-body { display: grid; grid-template-columns: 260px 1fr; flex: 1; min-height: 0; overflow: hidden; gap: 1px; background: var(--border); }
+  .panel { background: var(--bg2); overflow-y: auto; padding: 20px; }
+ 
+  .panel-title { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin-bottom: 16px; }
+  .health-gauge-wrap { display: flex; flex-direction: column; align-items: center; margin: 8px 0 16px; }
+  .gauge-ring { position: relative; width: 120px; height: 120px; }
+  .gauge-ring svg { transform: rotate(-90deg); }
+  .gauge-value { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+  .gauge-num { font-size: 28px; font-weight: 600; font-family: var(--mono); color: var(--text); }
+  .gauge-label { font-size: 11px; color: var(--text3); }
+  .gauge-status { margin-top: 6px; font-size: 12px; padding: 3px 10px; border-radius: 20px; background: var(--green-dim); color: var(--green); font-weight: 500; }
+ 
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .stat-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; }
+  .stat-card .s-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+  .stat-card .s-label i { font-size: 13px; }
+  .stat-card .s-val { font-size: 20px; font-weight: 600; font-family: var(--mono); }
+  .stat-card .s-sub { font-size: 10px; color: var(--text3); margin-top: 2px; }
+  .s-normal { color: var(--green); }
+  .s-warn { color: var(--amber); }
+  .s-alarm { color: var(--red); }
+  .s-offline { color: var(--text3); }
+  .s-total { color: var(--blue); }
+ 
+  .divider { height: 1px; background: var(--border); margin: 12px 0; }
+ 
+  .right-panel { display: flex; flex-direction: column; gap: 1px; background: var(--border); min-height: 0; overflow: hidden; }
+  .right-top { background: var(--bg2); padding: 16px 20px; flex: 1; min-height: 0; overflow-y: auto; }
+  .right-bottom { background: var(--bg2); padding: 16px 20px; height: 240px; flex-shrink: 0; }
+ 
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .section-title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .section-title i { font-size: 16px; color: var(--blue); }
+  .section-meta { font-size: 11px; color: var(--text3); }
+ 
+  .priority-table { width: 100%; border-collapse: collapse; }
+  .priority-table th { font-size: 11px; font-weight: 500; color: var(--text3); text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); letter-spacing: 0.05em; white-space: nowrap; }
+  .priority-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 12px; white-space: nowrap; }
+  .priority-table tr:last-child td { border-bottom: none; }
+  .priority-table tr:hover td { background: var(--bg3); }
+  .priority-table .rank { font-family: var(--mono); font-size: 11px; color: var(--text3); width: 24px; }
+  .priority-table .eq-id { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--blue); }
+  .health-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .health-bar { height: 4px; border-radius: 2px; background: var(--bg4); overflow: hidden; width: 52px; }
+  .health-bar-fill { height: 100%; border-radius: 2px; }
+  .health-num { font-family: var(--mono); font-size: 12px; font-weight: 500; }
+  .badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; white-space: nowrap; letter-spacing: 0.03em; }
+  .badge-alarm { background: var(--red-dim); color: var(--red); }
+  .badge-warn { background: var(--amber-dim); color: var(--amber); }
+  .badge-normal { background: var(--green-dim); color: var(--green); }
+  .badge-offline { background: var(--gray-dim); color: var(--text3); }
+  .badge-pending { background: rgba(59,130,246,0.12); color: var(--blue); }
+  .badge-dispatched { background: rgba(168,85,247,0.12); color: #a855f7; }
+  .badge-done { background: var(--green-dim); color: var(--green); }
+  .action-tag { font-size: 11px; color: var(--text2); }
+  .chart-wrap { position: relative; width: 100%; height: 170px; }
+ 
+  /* ===== Zone mgmt ===== */
+  .zone-body { display: grid; grid-template-columns: 180px 1fr; flex: 1; min-height: 0; overflow: hidden; gap: 1px; background: var(--border); }
+  .zone-list-panel { background: var(--bg2); overflow-y: auto; padding: 14px; }
+  /* zone-main：flex col，子項用 flex 分配高度，不用固定 px */
+  .zone-main { display: flex; flex-direction: column; gap: 1px; background: var(--border); min-height: 0; overflow: hidden; }
+ 
+  /* ===== 2. zone-top-row：1fr 2fr，stat:event = 1:2 ===== */
+  /* 原本用 grid 導致內部 overflow 覆蓋 fr，改成 display:flex 就能真正 1:2 */
+  .zone-top-row { display: flex; flex-shrink: 0; gap: 1px; background: var(--border); height: 260px; }
+  .zone-stat-panel  { background: var(--bg2); padding: 14px 16px; overflow-y: auto; flex: 1; min-width: 0; }
+  .zone-event-panel { background: var(--bg2); padding: 14px 16px; overflow-y: auto; flex: 2; min-width: 0; }
+ 
+  .zone-bottom-row { display: grid; grid-template-columns: 180px 1fr 1fr; gap: 1px; background: var(--border); flex: 1; min-height: 0; overflow: hidden; }
+  .zone-eq-panel    { background: var(--bg2); padding: 14px; overflow-y: auto; }
+  .zone-chart-panel { background: var(--bg2); padding: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .zone-trend-panel { background: var(--bg2); padding: 14px; overflow: hidden; display: flex; flex-direction: column; }
+ 
+  /* Zone list tree */
+  .zone-group { margin-bottom: 4px; }
+  .zone-group-header { display: flex; align-items: center; gap: 6px; padding: 7px 8px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text2); transition: all 0.15s; }
+  .zone-group-header:hover { background: var(--bg3); color: var(--text); }
+  .zone-group-header.active { background: var(--blue-dim); color: var(--blue); }
+  .zone-group-header i { font-size: 14px; }
+  .zone-group-arrow { font-size: 12px; margin-left: auto; transition: transform 0.2s; }
+  .zone-group.open .zone-group-arrow { transform: rotate(180deg); }
+  .zone-children { display: none; padding-left: 16px; }
+  .zone-group.open .zone-children { display: block; }
+  .zone-child { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: var(--radius); cursor: pointer; font-size: 12px; color: var(--text3); transition: all 0.15s; }
+  .zone-child:hover { background: var(--bg3); color: var(--text2); }
+  .zone-child.active { color: var(--blue); background: var(--bg3); }
+  .zone-child-dot { width: 6px; height: 6px; border-radius: 50%; }
+ 
+  .zone-stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .zone-stat-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; }
+  .zone-stat-card .zs-label { font-size: 10px; color: var(--text3); margin-bottom: 3px; }
+  .zone-stat-card .zs-val { font-size: 18px; font-weight: 600; font-family: var(--mono); }
+ 
+  .event-table { width: 100%; border-collapse: collapse; }
+  .event-table th { font-size: 10px; font-weight: 500; color: var(--text3); padding: 5px 8px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+  .event-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); font-size: 11px; }
+  .event-table tr:hover td { background: var(--bg3); }
+  .event-table tr:last-child td { border-bottom: none; }
+  .eq-id-sm { font-family: var(--mono); font-size: 11px; color: var(--blue); }
+ 
+  .eq-list-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius); cursor: pointer; border: 1px solid transparent; transition: all 0.15s; margin-bottom: 2px; }
+  .eq-list-item:hover { background: var(--bg3); }
+  .eq-list-item.active { background: var(--bg3); border-color: var(--border2); }
+  .eq-list-item .eq-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .eq-list-item .eq-name { font-size: 12px; color: var(--text2); flex: 1; }
+  .eq-list-item .eq-health { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+ 
+  .phase-legend { display: flex; gap: 14px; margin-bottom: 6px; font-size: 11px; flex-shrink: 0; }
+  .phase-legend span { display: flex; align-items: center; gap: 5px; color: var(--text2); }
+  .phase-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .current-vals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; flex-shrink: 0; }
+  .current-val-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 8px; text-align: center; }
+  .current-val-card .cv-label { font-size: 10px; color: var(--text3); margin-bottom: 2px; }
+  .current-val-card .cv-num { font-size: 15px; font-weight: 600; font-family: var(--mono); }
+ 
+  /* chart 容器：flex:1 讓 canvas 填滿剩餘空間 */
+  .chart-canvas-wrap { position: relative; flex: 1; min-height: 0; }
+ 
+  .placeholder-page { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: var(--text3); }
+  .placeholder-page i { font-size: 48px; opacity: 0.3; }
+  .placeholder-page p { font-size: 14px; }
+ 
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+ 
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon"><i class="ti ti-engine"></i></div>
+    <span class="logo-name">工業馬達管理平台</span>
+  </div>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" onclick="switchPage('overview', this)"><i class="ti ti-layout-dashboard" style="margin-right:4px;font-size:14px;vertical-align:-2px"></i>總覽</button>
+    <button class="nav-tab" onclick="switchPage('zone', this)"><i class="ti ti-map-2" style="margin-right:4px;font-size:14px;vertical-align:-2px"></i>區域管理</button>
+    <button class="nav-tab" onclick="switchPage('alarm', this)"><i class="ti ti-bell-ringing" style="margin-right:4px;font-size:14px;vertical-align:-2px"></i>告警中心</button>
+    <button class="nav-tab" onclick="switchPage('repair', this)"><i class="ti ti-tool" style="margin-right:4px;font-size:14px;vertical-align:-2px"></i>維修申報</button>
+    <button class="nav-tab" onclick="switchPage('report', this)"><i class="ti ti-report-analytics" style="margin-right:4px;font-size:14px;vertical-align:-2px"></i>報表中心</button>
+    <button class="nav-tab" onclick="switchPage('settings', this)"><i class="ti ti-settings" style="margin-right:4px;font-size:14px;vertical-align:-2px"></i>系統設定</button>
+  </nav>
+  <div class="header-right">
+    <div><span class="status-dot"></span><span class="status-label">系統正常</span></div>
+    <span id="clock">--:--:--</span>
+    <div class="header-icon"><i class="ti ti-bell" aria-hidden="true"></i></div>
+    <div class="user-badge">
+      <div class="user-avatar">管</div>
+      <span class="user-name">管理員</span>
+      <i class="ti ti-chevron-down" style="font-size:12px;color:var(--text3)" aria-hidden="true"></i>
+    </div>
+  </div>
+</header>
+ 
+<main class="main">
+ 
+<!-- ===== 總覽 ===== -->
+<div class="page active" id="page-overview">
+  <div class="overview-body">
+    <div class="panel">
+      <div class="panel-title">馬達健康度總覽</div>
+      <div class="health-gauge-wrap">
+        <div class="gauge-ring">
+          <svg width="120" height="120" viewBox="0 0 140 140">
+            <circle cx="70" cy="70" r="58" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
+            <circle cx="70" cy="70" r="58" fill="none" stroke="#3b82f6" stroke-width="10"
+              stroke-dasharray="364.4" stroke-dashoffset="72.9" stroke-linecap="round"/>
+          </svg>
+          <div class="gauge-value">
+            <div class="gauge-num">80</div>
+            <div class="gauge-label">平均健康度</div>
+          </div>
+        </div>
+        <div class="gauge-status"><i class="ti ti-trending-up" style="font-size:12px;vertical-align:-1px"></i> 較昨日 +2</div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="s-label"><i class="ti ti-cpu"></i>馬達總數</div>
+          <div class="s-val s-total">286</div><div class="s-sub">台設備</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-label"><i class="ti ti-circle-check"></i>正常</div>
+          <div class="s-val s-normal">210</div><div class="s-sub">台 (73.4%)</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-label"><i class="ti ti-alert-triangle"></i>警告</div>
+          <div class="s-val s-warn">52</div><div class="s-sub">台 (18.2%)</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-label"><i class="ti ti-alert-circle"></i>警報</div>
+          <div class="s-val s-alarm">20</div><div class="s-sub">台 (7.0%)</div>
+        </div>
+        <div class="stat-card" style="grid-column:1/-1;">
+          <div class="s-label"><i class="ti ti-wifi-off"></i>離線設備</div>
+          <div class="s-val s-offline">4</div><div class="s-sub">台 (1.4%) — 需確認連線狀態</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="panel-title">通訊狀態</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;flex-shrink:0"></span><span style="color:var(--text2);">每 60 秒主動上報</span></div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;flex-shrink:0"></span><span style="color:var(--text2);">Modbus RTU 連線正常</span></div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;flex-shrink:0"></span><span style="color:var(--text2);">RS-485 連線正常</span></div>
+      </div>
+    </div>
+    <div class="right-panel">
+      <div class="right-top">
+        <div class="section-header">
+          <div class="section-title"><i class="ti ti-list-numbers"></i>優先管理設備列表</div>
+          <div class="section-meta">即時更新</div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="priority-table">
+            <thead><tr><th>#</th><th>設備編號</th><th>位置</th><th>健康度</th><th>設備狀態</th><th>維修狀態</th></tr></thead>
+            <tbody id="priority-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="right-bottom">
+        <div class="section-header">
+          <div class="section-title"><i class="ti ti-chart-bar"></i>區域設備狀態概況</div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="areaChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+ 
+<!-- ===== 區域管理 ===== -->
+<div class="page" id="page-zone">
+  <div class="zone-body">
+    <div class="zone-list-panel">
+      <div class="panel-title">區域列表</div>
+      <div id="zone-tree"></div>
+    </div>
+    <div class="zone-main">
+      <div class="zone-top-row">
+        <div class="zone-stat-panel">
+          <div class="section-header" style="margin-bottom:8px;">
+            <div class="section-title"><i class="ti ti-map-pin"></i><span id="zone-stat-name">B區 生產車間</span> 區域概況</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div style="position:relative;width:70px;height:70px;flex-shrink:0;">
+              <svg width="70" height="70" viewBox="0 0 80 80" style="transform:rotate(-90deg)">
+                <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="7"/>
+                <circle cx="40" cy="40" r="32" fill="none" stroke="#3b82f6" stroke-width="7"
+                  stroke-dasharray="201" stroke-dashoffset="50" stroke-linecap="round" id="zone-gauge-arc"/>
+              </svg>
+              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
+                <div style="font-size:16px;font-weight:600;font-family:var(--mono);" id="zone-avg-health">75</div>
+                <div style="font-size:9px;color:var(--text3);">健康度</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;flex:1;">
+              <div class="zone-stat-card"><div class="zs-label">馬達總數</div><div class="zs-val s-total" id="z-total">64</div></div>
+              <div class="zone-stat-card"><div class="zs-label">離線</div><div class="zs-val s-offline" id="z-offline">2</div></div>
+              <div class="zone-stat-card"><div class="zs-label">今日事件</div><div class="zs-val s-total" id="z-events">8</div></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+            <div class="zone-stat-card" style="padding:7px 9px;">
+              <div class="zs-label" style="margin-bottom:5px;">正常</div>
+              <div style="display:flex;align-items:center;">
+                <span style="width:24px;height:24px;border-radius:50%;background:#22c55e;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i class="ti ti-check" style="font-size:14px;color:#fff;"></i>
+                </span>
+                <div class="zs-val s-normal" id="z-normal" style="flex:1;text-align:center;">45</div>
+              </div>
+            </div>
+            <div class="zone-stat-card" style="padding:7px 9px;">
+              <div class="zs-label" style="margin-bottom:5px;">警告</div>
+              <div style="display:flex;align-items:center;">
+                <span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i class="ti ti-alert-triangle-filled" style="font-size:24px;color:#f59e0b;"></i>
+                </span>
+                <div class="zs-val s-warn" id="z-warn" style="flex:1;text-align:center;">12</div>
+              </div>
+            </div>
+            <div class="zone-stat-card" style="padding:7px 9px;">
+              <div class="zs-label" style="margin-bottom:5px;">警報</div>
+              <div style="display:flex;align-items:center;">
+                <span style="width:24px;height:24px;border-radius:50%;background:#ef4444;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i class="ti ti-exclamation-mark" style="font-size:14px;color:#fff;font-weight:700;"></i>
+                </span>
+                <div class="zs-val s-alarm" id="z-alarm" style="flex:1;text-align:center;">5</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="zone-event-panel">
+          <div class="section-header" style="margin-bottom:6px;">
+            <div class="section-title"><i class="ti ti-clock-exclamation"></i>事件上報列表</div>
+            <div class="section-meta">按時間排序</div>
+          </div>
+          <div style="overflow-x:auto;overflow-y:auto;max-height:190px;">
+            <table class="event-table">
+              <thead><tr><th>設備編號</th><th>上報時間</th><th>健康度</th><th>狀態</th></tr></thead>
+              <tbody id="event-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="zone-bottom-row">
+        <div class="zone-eq-panel">
+          <div class="panel-title" style="margin-bottom:8px;">設備列表</div>
+          <div id="eq-list"></div>
+        </div>
+        <div class="zone-chart-panel">
+          <div class="section-header" style="margin-bottom:4px;">
+            <div class="section-title"><i class="ti ti-wave-sine"></i>三相電流即時曲線</div>
+          </div>
+          <div class="phase-legend">
+            <span><span class="phase-dot" style="background:#ef4444"></span>R 相</span>
+            <span><span class="phase-dot" style="background:#f59e0b"></span>S 相</span>
+            <span><span class="phase-dot" style="background:#3b82f6"></span>T 相</span>
+          </div>
+          <div id="selected-eq-name" style="font-size:11px;color:var(--text3);margin-bottom:4px;">選擇左側設備查看曲線</div>
+          <div class="chart-canvas-wrap">
+            <canvas id="phaseChart"></canvas>
+          </div>
+          <div class="current-vals">
+            <div class="current-val-card"><div class="cv-label">R 相 (A)</div><div class="cv-num" id="r-val" style="color:#ef4444">—</div></div>
+            <div class="current-val-card"><div class="cv-label">S 相 (A)</div><div class="cv-num" id="s-val" style="color:#f59e0b">—</div></div>
+            <div class="current-val-card"><div class="cv-label">T 相 (A)</div><div class="cv-num" id="t-val" style="color:#3b82f6">—</div></div>
+          </div>
+        </div>
+        <div class="zone-trend-panel">
+          <div class="section-header" style="margin-bottom:4px;">
+            <div class="section-title"><i class="ti ti-heart-rate-monitor"></i>健康度趨勢（近7天）</div>
+          </div>
+          <div id="selected-trend-name" style="font-size:11px;color:var(--text3);margin-bottom:4px;">選擇設備後顯示</div>
+          <div style="position:relative;flex:1;min-height:0;">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
+<div class="page" id="page-alarm"><div class="placeholder-page"><i class="ti ti-bell-ringing"></i><p style="font-size:18px;font-weight:500;">告警中心</p><p>此功能頁面建置中</p></div></div>
+<div class="page" id="page-repair"><div class="placeholder-page"><i class="ti ti-tool"></i><p style="font-size:18px;font-weight:500;">維修申報</p><p>此功能頁面建置中</p></div></div>
+<div class="page" id="page-report"><div class="placeholder-page"><i class="ti ti-report-analytics"></i><p style="font-size:18px;font-weight:500;">報表中心</p><p>此功能頁面建置中</p></div></div>
+<div class="page" id="page-settings"><div class="placeholder-page"><i class="ti ti-settings"></i><p style="font-size:18px;font-weight:500;">系統設定</p><p>此功能頁面建置中</p></div></div>
+ 
+</main>
+ 
+<script>
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('zh-TW',{hour12:false});
+}
+updateClock(); setInterval(updateClock,1000);
+ 
+function switchPage(id,btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+ 
+const priorityData = [
+  {rank:1,id:'C區-07',loc:'C區 倉儲中心',health:28,status:'alarm',repair:'待派工'},
+  {rank:2,id:'D區-03',loc:'D區 公用設施',health:33,status:'alarm',repair:'已派工'},
+  {rank:3,id:'A區-12',loc:'A區 生產大樓',health:38,status:'alarm',repair:'處理中'},
+  {rank:4,id:'B區-19',loc:'B區 生產車間',health:41,status:'alarm',repair:'待派工'},
+  {rank:5,id:'E區-04',loc:'E區 辦公大樓',health:47,status:'warn',repair:'待分析'},
+  {rank:6,id:'C區-11',loc:'C區 倉儲中心',health:52,status:'warn',repair:'已結案'},
+  {rank:7,id:'A區-06',loc:'A區 生產大樓',health:55,status:'warn',repair:'待派工'},
+  {rank:8,id:'B區-24',loc:'B區 生產車間',health:58,status:'warn',repair:'待分析'},
+  {rank:9,id:'D區-08',loc:'D區 公用設施',health:61,status:'warn',repair:'已派工'},
+  {rank:10,id:'E區-15',loc:'E區 辦公大樓',health:64,status:'warn',repair:'處理中'},
+];
+ 
+function healthColor(h){ return h>=70?'#22c55e':h>=40?'#f59e0b':'#ef4444'; }
+ 
+const tbody=document.getElementById('priority-tbody');
+priorityData.forEach(d=>{
+  const tr=document.createElement('tr');
+  const sb=d.status==='alarm'?'<span class="badge badge-alarm">警報</span>':'<span class="badge badge-warn">警告</span>';
+  const rb={'待派工':'<span class="badge badge-pending">待派工</span>','已派工':'<span class="badge badge-dispatched">已派工</span>','處理中':'<span class="badge badge-warn">處理中</span>','待分析':'<span class="badge badge-offline">待分析</span>','已結案':'<span class="badge badge-done">已結案</span>'}[d.repair]||d.repair;
+  tr.innerHTML=`
+  <td class="rank">${d.rank}</td>
+  <td class="eq-id">${d.id}</td>
+  <td style="color:var(--text2)">${d.loc}</td>
+  <td><div class="health-bar-wrap"><div class="health-bar"><div class="health-bar-fill" style="width:${d.health}%;background:${healthColor(d.health)}"></div></div><span class="health-num" style="color:${healthColor(d.health)}">${d.health}</span></div></td><td>${sb}</td>
+  
+  <td>${rb}</td>`;
+  tbody.appendChild(tr);
+});
+ 
+new Chart(document.getElementById('areaChart').getContext('2d'),{
+  type:'bar',
+  data:{labels:['A區','B區','C區','D區','E區'],datasets:[
+    {label:'正常',data:[62,45,38,30,35],backgroundColor:'rgba(34,197,94,0.7)',borderRadius:3},
+    {label:'警告',data:[10,12,8,7,15],backgroundColor:'rgba(245,158,11,0.7)',borderRadius:3},
+    {label:'警報',data:[3,5,7,4,1],backgroundColor:'rgba(239,68,68,0.7)',borderRadius:3},
+    {label:'離線',data:[1,2,0,1,0],backgroundColor:'rgba(139,146,168,0.4)',borderRadius:3},
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{color:'#8b92a8',font:{size:11},boxWidth:10,boxHeight:10,padding:10}}},scales:{x:{stacked:true,ticks:{color:'#8b92a8',font:{size:11}},grid:{color:'rgba(255,255,255,0.04)'}},y:{stacked:true,ticks:{color:'#8b92a8',font:{size:11}},grid:{color:'rgba(255,255,255,0.04)'},border:{dash:[3,3]}}}}
+});
+ 
+const zones={
+  A:{name:'A區 生產大樓',health:88,total:76,normal:62,warn:10,alarm:3,offline:1,events:4,eqs:[{id:'A區-01',health:92,status:'normal',r:14.2,s:14.5,t:14.1},{id:'A區-02',health:85,status:'normal',r:20.1,s:20.3,t:20.0},{id:'A區-03',health:78,status:'normal',r:18.5,s:22.1,t:18.2},{id:'A區-06',health:55,status:'warn',r:28.0,s:15.2,t:27.8},{id:'A區-12',health:38,status:'alarm',r:45.0,s:18.0,t:43.0}]},
+  B:{name:'B區 生產車間',health:75,total:64,normal:45,warn:12,alarm:5,offline:2,events:8,eqs:[{id:'B區-01',health:87,status:'normal',r:14.4,s:14.6,t:14.2},{id:'B區-03',health:80,status:'normal',r:16.0,s:16.2,t:15.9},{id:'B區-11',health:70,status:'normal',r:22.0,s:21.8,t:22.5},{id:'B區-19',health:41,status:'alarm',r:38.5,s:14.0,t:37.0},{id:'B區-24',health:58,status:'warn',r:32.0,s:32.5,t:31.8}]},
+  C:{name:'C區 倉儲中心',health:63,total:53,normal:38,warn:8,alarm:7,offline:0,events:11,eqs:[{id:'C區-02',health:91,status:'normal',r:12.1,s:12.3,t:12.0},{id:'C區-07',health:28,status:'alarm',r:55.0,s:20.0,t:52.0},{id:'C區-09',health:74,status:'normal',r:19.0,s:19.2,t:18.8},{id:'C區-11',health:52,status:'warn',r:25.0,s:24.8,t:25.5}]},
+  D:{name:'D區 公用設施',health:58,total:48,normal:30,warn:7,alarm:4,offline:1,events:7,eqs:[{id:'D區-03',health:33,status:'alarm',r:42.0,s:16.0,t:40.0},{id:'D區-05',health:80,status:'normal',r:30.0,s:30.2,t:29.8},{id:'D區-08',health:61,status:'warn',r:22.5,s:22.0,t:23.0}]},
+  E:{name:'E區 辦公大樓',health:82,total:45,normal:35,warn:15,alarm:1,offline:0,events:3,eqs:[{id:'E區-01',health:95,status:'normal',r:10.0,s:10.2,t:10.1},{id:'E區-04',health:47,status:'warn',r:28.0,s:27.5,t:29.0},{id:'E區-15',health:64,status:'warn',r:18.0,s:17.8,t:18.5}]},
+};
+ 
+const subZones={A:['A區-01','A區-02','A區-03','A區-06','A區-12'],B:['B區-01','B區-03','B區-11','B區-19','B區-24'],C:['C區-02','C區-07','C區-09','C區-11'],D:['D區-03','D區-05','D區-08'],E:['E區-01','E區-04','E區-15']};
+const eventData={
+  A:[
+    {id:'A區-12',time:'10:18:33',health:38,repair:'alarm'},
+    {id:'A區-06',time:'09:45:12',health:55,repair:'warn'},
+    {id:'A區-03',time:'08:22:05',health:78,repair:'normal'},
+  ],
+  B:[
+    {id:'B區-19',time:'10:24:01',health:41,repair:'alarm'},
+    {id:'B區-24',time:'10:11:47',health:58,repair:'warn'},
+    {id:'B區-11',time:'09:55:30',health:70,repair:'normal'},
+    {id:'B區-03',time:'08:10:00',health:80,repair:'normal'},
+  ],
+  C:[
+    {id:'C區-07',time:'10:22:15',health:28,repair:'alarm'},
+    {id:'C區-11',time:'10:05:40',health:52,repair:'warn'},
+    {id:'C區-09',time:'09:30:22',health:74,repair:'normal'},
+  ],
+  D:[
+    {id:'D區-03',time:'10:19:08',health:33,repair:'alarm'},
+    {id:'D區-08',time:'09:42:16',health:61,repair:'warn'},
+  ],
+  E:[
+    {id:'E區-04',time:'09:58:33',health:47,repair:'warn'},
+    {id:'E區-15',time:'08:45:00',health:64,repair:'warn'},
+  ]
+};
+ 
+function getHealthStatus(h){return h>=70?'normal':h>=40?'warn':'alarm';}
+function getStatusColor(s){return{alarm:'#ef4444',warn:'#f59e0b',normal:'#22c55e',offline:'#545d74'}[s]||'#545d74';}
+ 
+const tree=document.getElementById('zone-tree');
+Object.keys(zones).forEach(zk=>{
+  const grp=document.createElement('div');
+  grp.className='zone-group'+(zk==='B'?' open':'');
+  grp.innerHTML=`
+  <div class="zone-group-header${zk==='B'?' active':''}" onclick="toggleZone(this,'${zk}')">
+    <i class="ti ti-building-factory"></i>${zk}區<i class="ti ti-chevron-down zone-group-arrow"></i>
+  </div>
+  <div class="zone-children">${subZones[zk].map(id=>{const eq=zones[zk].eqs.find(e=>e.id===id);return`<div class="zone-child" onclick="selectEqFromTree('${zk}','${id}',this)"><span class="zone-child-dot" style="background:${getStatusColor(getHealthStatus(eq?.health||100))}"></span>${id}</div>`;}).join('')}</div>`;
+  tree.appendChild(grp);
+});
+ 
+let currentZone='B',currentEq=null,phaseChart=null,trendChart=null;
+ 
+function toggleZone(el,zk){
+  const grp=el.parentElement,wasOpen=grp.classList.contains('open');
+  document.querySelectorAll('.zone-group').forEach(g=>g.classList.remove('open'));
+  document.querySelectorAll('.zone-group-header').forEach(h=>h.classList.remove('active'));
+  if(!wasOpen){grp.classList.add('open');el.classList.add('active');}
+  currentZone=zk; renderZoneStats(zk); renderEventList(zk); renderEqList(zk); clearCharts();
+}
+ 
+function renderZoneStats(zk){
+  const z=zones[zk];
+  document.getElementById('zone-stat-name').textContent=z.name;
+  document.getElementById('zone-avg-health').textContent=z.health;
+  document.getElementById('z-total').textContent=z.total;
+  document.getElementById('z-normal').textContent=z.normal;
+  document.getElementById('z-warn').textContent=z.warn;
+  document.getElementById('z-alarm').textContent=z.alarm;
+  document.getElementById('z-offline').textContent=z.offline;
+  document.getElementById('z-events').textContent=z.events;
+  const circ=201,offset=circ-(z.health/100)*circ;
+  document.getElementById('zone-gauge-arc').setAttribute('stroke-dashoffset',offset);
+  document.getElementById('zone-gauge-arc').setAttribute('stroke',healthColor(z.health));
+}
+ 
+function renderEventList(zk){
+  const tb=document.getElementById('event-tbody');tb.innerHTML='';
+  (eventData[zk]||[]).forEach(ev=>{
+    const tr=document.createElement('tr');
+    const rb={alarm:'<span class="badge badge-alarm">緊急</span>',warn:'<span class="badge badge-warn">待處理</span>',normal:'<span class="badge badge-normal">正常</span>'}[ev.repair];
+    tr.innerHTML=`
+    <td class="eq-id-sm">${ev.id}</td>
+    <td style="font-family:var(--mono);font-size:10px;color:var(--text3)">${ev.time}</td>
+    <td><span style="font-family:var(--mono);font-size:11px;font-weight:500;color:${healthColor(ev.health)}">${ev.health}</span></td>
+    <td>${rb}</td>`;
+    tb.appendChild(tr);
+  });
+}
+ 
+function renderEqList(zk){
+  const list=document.getElementById('eq-list');list.innerHTML='';
+  zones[zk].eqs.forEach(eq=>{
+    const div=document.createElement('div');div.className='eq-list-item';div.id='eq-item-'+eq.id;
+    div.innerHTML=`<span class="eq-dot" style="background:${getStatusColor(getHealthStatus(eq.health))}"></span><span class="eq-name">${eq.id}</span><span class="eq-health" style="color:${healthColor(eq.health)}">${eq.health}</span>`;
+    div.onclick=()=>selectEq(zk,eq.id,div);list.appendChild(div);
+  });
+}
+ 
+function selectEqFromTree(zk,eqId,el){
+  if(currentZone!==zk){
+    const grpHeader=el.closest('.zone-group').querySelector('.zone-group-header');
+    document.querySelectorAll('.zone-group').forEach(g=>g.classList.remove('open'));
+    document.querySelectorAll('.zone-group-header').forEach(h=>h.classList.remove('active'));
+    el.closest('.zone-group').classList.add('open');grpHeader.classList.add('active');
+    currentZone=zk;renderZoneStats(zk);renderEventList(zk);renderEqList(zk);
+  }
+  document.querySelectorAll('.zone-child').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  setTimeout(()=>{const item=document.getElementById('eq-item-'+eqId);if(item)selectEq(zk,eqId,item);},50);
+}
+ 
+function selectEq(zk,eqId,el){
+  document.querySelectorAll('.eq-list-item').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  currentEq=zones[zk].eqs.find(e=>e.id===eqId);if(!currentEq)return;
+  document.getElementById('selected-eq-name').textContent=eqId+' 三相電流';
+  document.getElementById('selected-trend-name').textContent=eqId+' 近7日健康度';
+  document.getElementById('r-val').textContent=currentEq.r.toFixed(1);
+  document.getElementById('s-val').textContent=currentEq.s.toFixed(1);
+  document.getElementById('t-val').textContent=currentEq.t.toFixed(1);
+  renderPhaseChart(currentEq);renderTrendChart(currentEq);
+}
+ 
+function generatePhaseData(base,noise){return Array.from({length:30},()=>+(base+(Math.random()-.5)*noise).toFixed(2));}
+ 
+function renderPhaseChart(eq){
+  const labels=Array.from({length:30},(_,i)=>{const m=10*60+i*2;return Math.floor(m/60)+':'+String(m%60).padStart(2,'0');});
+  const rD=generatePhaseData(eq.r,eq.r*.06),sD=generatePhaseData(eq.s,eq.s*.06),tD=generatePhaseData(eq.t,eq.t*.06);
+  rD[29]=eq.r;sD[29]=eq.s;tD[29]=eq.t;
+  if(phaseChart)phaseChart.destroy();
+  phaseChart=new Chart(document.getElementById('phaseChart').getContext('2d'),{
+    type:'line',data:{labels,datasets:[
+      {label:'R相',data:rD,borderColor:'#ef4444',borderWidth:1.5,pointRadius:0,tension:0.3,fill:false},
+      {label:'S相',data:sD,borderColor:'#f59e0b',borderWidth:1.5,pointRadius:0,tension:0.3,fill:false},
+      {label:'T相',data:tD,borderColor:'#3b82f6',borderWidth:1.5,pointRadius:0,tension:0.3,fill:false},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#545d74',font:{size:9},maxTicksLimit:6},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#8b92a8',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'},border:{dash:[3,3]}}},animation:{duration:300}}
+  });
+}
+ 
+// Per-equipment AI data
+const eqAiData = {
+  'A區-01':{degrade:'-0.6/天',fault:'45 天後',ai:'健康度穩定，劣化速度正常。建議按例行週期維保。'},
+  'A區-02':{degrade:'-0.8/天',fault:'38 天後',ai:'電流略有波動，建議下次維保時確認接線端子緊固狀態。'},
+  'A區-03':{degrade:'-1.2/天',fault:'21 天後',ai:'振動值呈上升趨勢，疑似基座鬆動或輕微軸承磨損，建議安排現場確認。'},
+  'A區-06':{degrade:'-2.5/天',fault:'6 天後',ai:'電流不平衡加劇，三相差值達 12A，判斷接觸器老化或接線鬆弛，需優先處理。'},
+  'A區-12':{degrade:'-4.3/天',fault:'2 天後',ai:'嚴重三相失衡，健康度急速劣化，預計 2 日內可能停機。請立即停機檢修。'},
+  'B區-01':{degrade:'-0.5/天',fault:'60 天後',ai:'運行狀況良好，各項參數正常，依計畫維護即可。'},
+  'B區-03':{degrade:'-0.7/天',fault:'50 天後',ai:'輕微溫升趨勢，建議清潔散熱片，並確認環境溫度是否過高。'},
+  'B區-11':{degrade:'-1.0/天',fault:'28 天後',ai:'溫升偏高 +12°C，疑似散熱不良或負載過高，建議調整負載分配。'},
+  'B區-19':{degrade:'-3.8/天',fault:'3 天後',ai:'絕緣阻抗持續下降，高風險劣化中，預估 3 日內絕緣崩潰風險高，請儘速處理。'},
+  'B區-24':{degrade:'-2.1/天',fault:'12 天後',ai:'啟動電流偏高，疑似啟動器設定異常或機械阻力增大，建議盡快排查。'},
+  'C區-02':{degrade:'-0.4/天',fault:'80 天後',ai:'設備狀態良好，各指標正常，依例行計畫維護。'},
+  'C區-07':{degrade:'-5.1/天',fault:'1 天後',ai:'極度劣化！運轉電流超額定值 150%，設備隨時可能損毀，請立即停機。'},
+  'C區-09':{degrade:'-1.3/天',fault:'20 天後',ai:'功率因數下降，疑似電容器組老化，建議更換並複測。'},
+  'C區-11':{degrade:'-2.0/天',fault:'14 天後',ai:'軸承振動異常，加速劣化中，建議本週完成軸承更換。'},
+  'D區-03':{degrade:'-4.6/天',fault:'2 天後',ai:'繞組溫度過高且持續上升，可能導致絕緣燒毀，需立即停機降溫並送修。'},
+  'D區-05':{degrade:'-0.6/天',fault:'55 天後',ai:'運行穩定，依排程維護即可。'},
+  'D區-08':{degrade:'-1.5/天',fault:'18 天後',ai:'潤滑油更換已逾期，劣化速度加快，請本週完成潤滑保養。'},
+  'E區-01':{degrade:'-0.3/天',fault:'100 天後',ai:'設備狀態優良，為全廠健康度最高設備，繼續例行維護。'},
+  'E區-04':{degrade:'-2.3/天',fault:'10 天後',ai:'振動數值持續攀升，疑似基座螺絲鬆動引發共振，建議本週鎖緊並進行動平衡校驗。'},
+  'E區-15':{degrade:'-1.8/天',fault:'17 天後',ai:'V 相電壓偏低造成電流不平衡，建議確認供電品質與端子接線是否鬆脫。'},
+};
+ 
+// Anomaly events per equipment (day index 0-6, label, severity)
+const eqAnomalyEvents = {
+  'A區-06':[[3,'電流異常','warn'],[5,'不平衡加劇','alarm']],
+  'A區-12':[[2,'過電流','alarm'],[4,'三相失衡','alarm'],[6,'嚴重失衡','alarm']],
+  'B區-19':[[1,'絕緣降低','warn'],[4,'阻抗劣化','alarm'],[6,'高風險','alarm']],
+  'B區-24':[[3,'啟動異常','warn'],[5,'電流偏高','warn']],
+  'C區-07':[[0,'過載','alarm'],[2,'超額定','alarm'],[5,'極度異常','alarm'],[6,'危急','alarm']],
+  'C區-11':[[2,'振動異常','warn'],[5,'加速劣化','alarm']],
+  'D區-03':[[1,'溫升','warn'],[3,'過熱','alarm'],[6,'危急','alarm']],
+  'D區-08':[[2,'潤滑警告','warn'],[5,'逾期','warn']],
+  'E區-04':[[1,'振動','warn'],[4,'共振','warn'],[6,'加速','alarm']],
+  'E區-15':[[2,'電壓偏低','warn'],[5,'不平衡','warn']],
+};
+ 
+function renderTrendChart(eq){
+  const today=new Date();
+  const labels=Array.from({length:7},(_,i)=>{const d=new Date(today);d.setDate(d.getDate()-(6-i));return(d.getMonth()+1)+'/'+(d.getDate());});
+  const endH=eq.health,startH=Math.min(98,endH+20+Math.floor(Math.random()*10));
+  const hData=Array.from({length:7},(_,i)=>Math.max(0,Math.min(100,Math.round(startH+(endH-startH)*(i/6)+(Math.random()-.5)*3))));
+  hData[6]=endH;
+  if(trendChart)trendChart.destroy();
+ 
+  // Anomaly annotation plugin
+  const anomalies = eqAnomalyEvents[eq.id] || [];
+  const anomalyPlugin = {
+    id:'anomalyMarkers',
+    afterDraw(chart){
+      const {ctx,scales:{x,y}}=chart;
+      anomalies.forEach(([dayIdx,label,sev])=>{
+        const px=x.getPixelForValue(dayIdx);
+        const py=y.getPixelForValue(hData[dayIdx]);
+        const col = sev==='alarm'?'#ef4444':'#f59e0b';
+        // vertical dashed line
+        ctx.save();
+        ctx.setLineDash([3,3]);
+        ctx.strokeStyle=col+'99';
+        ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(px,y.top);ctx.lineTo(px,y.bottom);ctx.stroke();
+        // circle marker
+        ctx.setLineDash([]);
+        ctx.fillStyle=col;
+        ctx.beginPath();ctx.arc(px,py,5,0,Math.PI*2);ctx.fill();
+        // label above
+        ctx.fillStyle=col;
+        ctx.font='bold 9px IBM Plex Sans TC,sans-serif';
+        ctx.textAlign='center';
+        ctx.fillText(label,px,py-10);
+        ctx.restore();
+      });
+    }
+  };
+ 
+  trendChart=new Chart(document.getElementById('trendChart').getContext('2d'),{
+    type:'line',
+    data:{labels,datasets:[{
+      label:'健康度',data:hData,
+      borderColor:healthColor(endH),backgroundColor:'transparent',
+      borderWidth:2,pointRadius:5,pointBackgroundColor:healthColor(endH),
+      pointBorderColor:'transparent',tension:0.2,fill:false
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          label:c=>'健康度: '+c.raw,
+          afterLabel:c=>{
+            const a=anomalies.find(([d])=>d===c.dataIndex);
+            return a?'⚠ '+a[1]:'';
+          }
+        }}
+      },
+      scales:{
+        x:{ticks:{color:'#8b92a8',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{min:0,max:100,ticks:{color:'#8b92a8',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'},border:{dash:[3,3]}}
+      },
+      animation:{duration:300}
+    },
+    plugins:[anomalyPlugin]
+  });
+ 
+  // Update AI panel
+  const ai = eqAiData[eq.id] || {degrade:'—',fault:'—',ai:'暫無 AI 判讀資料'};
+  const panel = document.getElementById('trend-ai-panel');
+  panel.style.display='flex';
+  const degradeEl=document.getElementById('td-degrade');
+  const faultEl=document.getElementById('td-fault');
+  degradeEl.textContent=ai.degrade;
+  const dVal=parseFloat(ai.degrade);
+  degradeEl.style.color=dVal<=-3?'#ef4444':dVal<=-1.5?'#f59e0b':'#22c55e';
+  faultEl.textContent=ai.fault;
+  document.getElementById('td-ai').textContent=ai.ai;
+}
+ 
+function clearCharts(){
+  if(phaseChart){phaseChart.destroy();phaseChart=null;}
+  if(trendChart){trendChart.destroy();trendChart=null;}
+  document.getElementById('selected-eq-name').textContent='選擇左側設備查看曲線';
+  document.getElementById('selected-trend-name').textContent='選擇設備後顯示';
+  ['r-val','s-val','t-val'].forEach(id=>document.getElementById(id).textContent='—');
+  document.getElementById('trend-ai-panel').style.display='none';
+}
+ 
+// Risk management
+const risks={mechanical:{icon:'ti-settings-cog',children:['皮帶斷裂','軸承異常']},electrical:{icon:'ti-bolt',children:['欠相','負載異常','三相不平衡']},insulation:{icon:'ti-shield',children:['局部放電']}};
+const riskData={'欠相':{count:12,high:5,events:18,analysis:'偵測到多台設備存在相電流失衡現象，建議檢查接線與供電品質。',eqs:[{id:'A區-12',health:38},{id:'C區-07',health:28},{id:'B區-19',health:41}]},'軸承異常':{count:8,high:2,events:11,analysis:'軸承振動值異常升高，可能潤滑不足。',eqs:[{id:'C區-11',health:52},{id:'D區-08',health:61}]},'局部放電':{count:4,high:1,events:5,analysis:'絕緣老化風險提升。',eqs:[{id:'E區-15',health:64}]}};
+const nameMap={mechanical:'機械層',electrical:'電器層',insulation:'絕緣層'};
+const riskTree=document.getElementById('risk-tree');
+Object.entries(risks).forEach(([key,val])=>{
+  const div=document.createElement('div');div.className='zone-group';
+  div.innerHTML=`<div class="zone-group-header" onclick="this.parentElement.classList.toggle('open')"><i class="ti ${val.icon}"></i>${nameMap[key]}<i class="ti ti-chevron-down zone-group-arrow"></i></div><div class="zone-children">${val.children.map(item=>`<div class="zone-child" onclick="selectRisk('${item}',this)"><span class="zone-child-dot" style="background:#ef4444"></span>${item}</div>`).join('')}</div>`;
+  riskTree.appendChild(div);
+});
+ 
+function selectRisk(name,el){
+  document.querySelectorAll('#risk-tree .zone-child').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  const data=riskData[name];if(!data)return;
+  document.getElementById('risk-name').textContent=name;
+  document.getElementById('risk-count').textContent=data.count;
+  document.getElementById('risk-high').textContent=data.high;
+  document.getElementById('risk-events').textContent=data.events;
+  document.getElementById('risk-analysis').textContent=data.analysis;
+  document.getElementById('risk-eq-list').innerHTML=data.eqs.map(eq=>`<div class="eq-list-item"><span class="eq-dot" style="background:${healthColor(eq.health)}"></span><span class="eq-name">${eq.id}</span><span class="eq-health" style="color:${healthColor(eq.health)}">${eq.health}</span></div>`).join('');
+}
+ 
+selectRisk('欠相',document.querySelector('#risk-tree .zone-child'));
+renderZoneStats('B'); renderEventList('B'); renderEqList('B');
+ 
+// ===== Maintenance Schedule =====
+const maintData = [
+  {id:'C區-07',event:'運轉電流超額定值 150%',health:28,degrade:'-5.1/天',fault:'5/19 預計停機',bestTime:'5/19 (週一) 00:00–04:00',cycle:'3 天',risk:'延後即日停機風險極高，繞組燒毀機率 87%',impact:'C區生產線停工 4h，影響訂單 #A2403 約 NT$12,000',priority:'P0 緊急'},
+  {id:'D區-03',event:'繞組溫度過高',health:33,degrade:'-4.6/天',fault:'5/20 預計停機',bestTime:'5/19 (週一) 02:00–06:00',cycle:'5 天',risk:'延後 1 天停機風險增加 40%，可能引發連鎖故障',impact:'D區公用設施停工 4h，不影響主生產線，NT$6,000',priority:'P0 緊急'},
+  {id:'A區-12',event:'三相電流嚴重不平衡',health:38,degrade:'-4.3/天',fault:'5/21 預計停機',bestTime:'5/20 (週二) 03:00–07:00',cycle:'6 天',risk:'延後維修故障機率每日上升 15%，接觸器燒毀風險',impact:'A區生產線停工 4h，訂單 #A2402 有輕微影響，NT$18,000',priority:'P0 緊急'},
+  {id:'B區-19',event:'絕緣阻抗劣化',health:41,degrade:'-3.8/天',fault:'5/22 預計停機',bestTime:'5/21 (週三) 01:00–05:00',cycle:'9 天',risk:'絕緣阻抗已低於安全閾值，每延後 1 天風險增加 25%',impact:'B區生產線停工 4h，錯開訂單 #A2401，NT$9,500',priority:'P1 高優先'},
+  {id:'C區-11',event:'軸承振動異常',health:52,degrade:'-2.0/天',fault:'5/26 可能故障',bestTime:'5/22 (週四) 02:00–04:00',cycle:'9 天',risk:'軸承疲勞裂縫加速，延後維修磨損擴大機率 60%',impact:'C區停工 2h，訂單 #A2403 交期無影響，NT$4,000',priority:'P1 高優先'},
+  {id:'E區-04',event:'基座螺絲鬆動 / 振動偏高',health:47,degrade:'-2.3/天',fault:'5/25 可能故障',bestTime:'5/22 (週四) 08:00–10:00',cycle:'9 天',risk:'共振持續可能導致軸承磨損加速，預計 10 天內擴大',impact:'E區辦公設施，停工 2h，生產線無影響，NT$1,500',priority:'P1 高優先'},
+  {id:'B區-24',event:'啟動電流偏高',health:58,degrade:'-2.1/天',fault:'5/30 可能故障',bestTime:'5/24 (週六) 06:00–08:00',cycle:'10 天',risk:'延後維修啟動器損壞機率 35%，週末維修成本較低',impact:'B區停工 2h，週六無排單，NT$2,000',priority:'P2 中優先'},
+  {id:'D區-08',event:'潤滑油更換逾期',health:61,degrade:'-1.5/天',fault:'6/2 可能故障',bestTime:'5/25 (週日) 08:00–09:00',cycle:'20 天',risk:'潤滑不足加速軸承磨損，延後每天上升 8% 故障率',impact:'D區停工 1h，週日無排單，NT$800',priority:'P2 中優先'},
+  {id:'E區-15',event:'V 相電壓偏低',health:64,degrade:'-1.8/天',fault:'6/1 可能故障',bestTime:'5/25 (週日) 10:00–12:00',cycle:'12 天',risk:'電壓持續偏低將加速繞組老化，風險目前可控',impact:'E區停工 2h，週日無排單，NT$1,200',priority:'P2 中優先'},
+  {id:'A區-06',event:'電流不平衡',health:55,degrade:'-2.5/天',fault:'5/28 可能故障',bestTime:'5/23 (週五) 22:00–24:00',cycle:'15 天',risk:'三相不平衡可能引發過熱，延後 3 天後風險顯著提升',impact:'A區生產線停工 2h，夜間排單空窗期，NT$3,500',priority:'P2 中優先'},
+];
+ 
+const priorityStyle = {
+  'P0 緊急':{bg:'var(--red-dim)',color:'var(--red)'},
+  'P1 高優先':{bg:'var(--amber-dim)',color:'var(--amber)'},
+  'P2 中優先':{bg:'rgba(59,130,246,0.12)',color:'var(--blue)'},
+};
+ 
+const mtbody = document.getElementById('maint-tbody');
+maintData.forEach(d=>{
+  const tr=document.createElement('tr');
+  tr.style.borderBottom='1px solid var(--border)';
+  const ps=priorityStyle[d.priority]||{bg:'var(--bg3)',color:'var(--text3)'};
+  const dVal=parseFloat(d.degrade);
+  const dCol=dVal<=-3?'#ef4444':dVal<=-1.5?'#f59e0b':'#22c55e';
+  tr.innerHTML=`
+    <td style="padding:8px 10px;white-space:nowrap;"><span style="font-family:var(--mono);font-size:12px;font-weight:500;color:var(--blue);">${d.id}</span></td>
+    <td style="padding:8px 10px;font-size:11px;color:var(--text2);max-width:130px;">${d.event}</td>
+    <td style="padding:8px 10px;text-align:center;">
+      <div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">
+        <div style="height:3px;width:44px;background:var(--bg4);border-radius:2px;overflow:hidden;"><div style="height:100%;width:${d.health}%;background:${healthColor(d.health)};border-radius:2px;"></div></div>
+        <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${healthColor(d.health)};">${d.health}</span>
+      </div>
+    </td>
+    <td style="padding:8px 10px;font-family:var(--mono);font-size:11px;font-weight:600;color:${dCol};white-space:nowrap;">${d.degrade}</td>
+    <td style="padding:8px 10px;font-size:11px;color:var(--red);font-weight:500;white-space:nowrap;">${d.fault}</td>
+    <td style="padding:8px 10px;font-size:11px;color:var(--green);font-weight:500;white-space:nowrap;">${d.bestTime}</td>
+    <td style="padding:8px 10px;font-size:11px;color:var(--text2);white-space:nowrap;">${d.cycle}</td>
+    <td style="padding:8px 10px;font-size:11px;color:var(--text2);max-width:160px;line-height:1.5;">${d.risk}</td>
+    <td style="padding:8px 10px;font-size:11px;color:var(--text2);max-width:150px;line-height:1.5;">${d.impact}</td>
+    <td style="padding:8px 10px;text-align:center;white-space:nowrap;">
+      <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:${ps.bg};color:${ps.color};">${d.priority}</span>
+    </td>
+  `;
+  mtbody.appendChild(tr);
+});
+ 
+// Heat grid
+const heatDays=['5/19','5/20','5/21','5/22','5/23','5/24','5/25'];
+const heatLevels=[[2,3,3,2,1,0,0],[3,3,2,1,1,0,0],[2,2,3,3,2,0,0]]; // 0=low,3=high, 3 time slots
+const heatColors=['rgba(34,197,94,0.35)','rgba(245,158,11,0.35)','rgba(245,158,11,0.55)','rgba(239,68,68,0.55)'];
+const hg=document.getElementById('heat-grid');
+if(hg){
+  // header row
+  heatDays.forEach(d=>{const c=document.createElement('div');c.style.cssText='font-size:9px;color:var(--text3);text-align:center;padding-bottom:2px;';c.textContent=d;hg.appendChild(c);});
+  ['白班','中班','夜班'].forEach((_,si)=>{
+    heatDays.forEach((_,di)=>{
+      const lv=heatLevels[si][di];
+      const c=document.createElement('div');
+      c.style.cssText=`height:14px;border-radius:2px;background:${heatColors[lv]};cursor:pointer;`;
+      c.title=`${heatDays[di]} ${['白班08-16','中班16-24','夜班00-08'][si]} — 風險：${'低中中高'.split('')[lv]}`;
+      hg.appendChild(c);
+    });
+  });
+}
+</script>
+</body>
+</html>
+ 
